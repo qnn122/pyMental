@@ -1,8 +1,8 @@
 from Study import Study
 from matplotlib import pyplot as plt
 
-is_plotHB_raw = 1
-is_plot2lvl = 0
+is_plotHB_raw = 0
+is_plot2lvl = 1
 is_plotHB_filt= 0
 
 # Initialize data
@@ -23,16 +23,19 @@ if is_plotHB_raw:
 	plt.subplot(212), study1.plot_Hb(df.T, 'deoHb', marker=marker)
 
 # Plot 2 levels of mental workload
+Hbtype = 'deoHb'
 if is_plot2lvl:
 	lvl1_trials = ['Trial 1', 'Trial 4'] # exe
 	lvl2_trials = ['Trial 2', 'Trial 3'] # ima
 	plt.figure()
-	plt.subplot(321), study1.plot_mean_2lvl('Channel 1', 'oxyHb', lvl1_trials, lvl2_trials)
-	plt.subplot(322), study1.plot_mean_2lvl('Channel 2', 'oxyHb', lvl1_trials, lvl2_trials)
-	plt.subplot(323), study1.plot_mean_2lvl('Channel 3', 'oxyHb', lvl1_trials, lvl2_trials)
-	plt.subplot(324), study1.plot_mean_2lvl('Channel 4', 'oxyHb', lvl1_trials, lvl2_trials)
-	plt.subplot(325), study1.plot_mean_2lvl('Channel 5', 'oxyHb', lvl1_trials, lvl2_trials)
-	plt.subplot(326), study1.plot_mean_2lvl('Channel 6', 'oxyHb', lvl1_trials, lvl2_trials)
+	plt.subplot(352), study1.plot_mean_2lvl('Channel 1', Hbtype, lvl1_trials, lvl2_trials)
+	plt.subplot(354), study1.plot_mean_2lvl('Channel 2', Hbtype, lvl1_trials, lvl2_trials)
+	plt.subplot(356), study1.plot_mean_2lvl('Channel 3', Hbtype, lvl1_trials, lvl2_trials)
+	plt.subplot(358), study1.plot_mean_2lvl('Channel 4', Hbtype, lvl1_trials, lvl2_trials)
+	plt.subplot(3,5,10), study1.plot_mean_2lvl('Channel 5', Hbtype, lvl1_trials, lvl2_trials)
+	plt.subplot(3,5,12), study1.plot_mean_2lvl('Channel 6', Hbtype, lvl1_trials, lvl2_trials)
+	plt.subplot(3,5,14), study1.plot_mean_2lvl('Channel 7', Hbtype, lvl1_trials, lvl2_trials)
+
 
 # Plot filtered signal
 if is_plotHB_filt:

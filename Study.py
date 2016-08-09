@@ -15,6 +15,10 @@ class Dataset():
 		self.filename = filename
 		self.HbTypes = ['oxyHb', 'deoHb', 'totHb']
 
+		# TODO: import Fs 
+		ts = 0.055
+		self.Fs = 1/ts
+
 		# Read number of channel and create columns label
 		try: 	# TODO: handle error here, including filename not found
 			#data_import = pd.read_csv(filename, skiprows=34, sep='\t') # only valid for FOIRE-3000
@@ -31,8 +35,12 @@ class Dataset():
 
 		# Import data and create dataframe
 		try:
-			self.data_import = pd.read_csv(filename, skiprows=35, sep='\t').as_matrix()
-			self.df = pd.DataFrame(self.data_import[:, 4:], columns=columnslbl) # 3 first columns contains times series and marker -> remove
+			data_import_temp = pd.read_csv(filename, skiprows=35, sep='\t').as_matrix()
+			len_data_temp = len(data_import_temp[:,1])
+			len_data = len_data_temp - (len_data_temp % self.numtrial)
+			print '==== len of whole data: ', len_data
+			self.data_import = data_import_temp[0:len_data, 4:]
+			self.df = pd.DataFrame(self.data_import, columns=columnslbl) # 3 first columns contains times series and marker -> remove
 		except:
 			print 'Something wrong 2'
 		
@@ -40,29 +48,44 @@ class Dataset():
 		self.task_id = self.data_import[:, 1] == 1
 		self.len_task = np.sum(self.task_id)/self.numtrial
 
+		# Trial info
+		# self.pretask = self.data_import[:, 1] == 0
+		# self.posttask = self.data_import[:, 1] == 2
+		# self.trial_id = np.append([self.pretask, self.task_id, self.posttask], axis=0)
 
-		# TODO: import Fs 
-		ts = 0.055
-		self.Fs = 1/ts
+		self.len_trial = len(self.data_import[:,1])/self.numtrial
+
+		# print 'trial_id: ', self.trial_id
+		# print 'len of trial_id', len(self.trial_id)
+		print '===== len of each trial', self.len_trial
+
+		#
 		self.time = pd.Series(self.data_import[:, 0]) 		# first columnn contains time series
 		self.event = pd.Series(self.data_import[:, 1])		# second column = event vector
-	
+
+		self.dfmi = pd.DataFrame() 	# df that has been split into trials, 'mi' = multi index
+
 	def append_data(self, filename):
 		# Read newd data file
 		newdataset = Dataset(filename)
 
 		# Update dataset variables
-		print self.df.tail()
 		newindex = newdataset.df.index + len(self.df.index)
 		newdataset.df.index = newindex
 		newdataset.event.index = newindex
 		self.df = self.df.append(newdataset.df)
 
-		print self.df.tail()
 		self.numtrial = self.numtrial + newdataset.numtrial
 		
 		self.task_id = np.append(self.task_id, newdataset.task_id)
 		self.event = self.event.append(newdataset.event)
+
+	#TODO: check consistency between dataset's number of trial and label
+	def read_label(self, labelfile):
+		label = pd.read_csv(labelfile, nrows=1, sep='\t', header=None, index_col=0)
+		task_label = label.values[0][0].split(' ')
+		task_label = np.array(task_label)
+		self.label = task_label
 
 	def set_Fs(self, Fs):
 		self.Fs = Fs
@@ -158,6 +181,17 @@ class Study(): # TODO: Class con cua Dataset?
 		'''Return number of labels'''
 		pass
 
+	def get_trial_fromlabel(self, labelclass):
+		if not len(self.dataset.label)> 0:
+			print 'Error: label has not been loaded'
+			pass
+
+		mylabel = np.where(self.dataset.label==labelclass)[0] + 1
+		mytrial = []
+		for i in mylabel:
+			mytrial.append('Trial ' + str(i))
+		return mytrial
+    
 	''' =========== Visualization ================'''
 	@staticmethod
 	def plot_Hb(df, hbtype, marker=pd.Series()):
@@ -209,18 +243,19 @@ class Study(): # TODO: Class con cua Dataset?
 		'''
 		pass
 
-	def plot_mean_2lvl(self, chan, Hbtype, lvl1_trials, lvl2_trials):
+	def split2trials(self): #TODO: need improving here, make function applicable for any df
 		# General filtering
 		self.gen_filt()
 
 		# Split data into chunks
 		data_filt = self.dfbp_mva_sm.as_matrix()
 
-		task = data_filt.T[self.dataset.task_id, :]
+		# task = data_filt.T[self.dataset.task_id, :]
+		trial = data_filt.T;
 
 		# Create trial-based data frame
 		miTrial = pd.MultiIndex.from_product([Dataset.mklbl('Trial ', self.dataset.numtrial),
-											[x for x in range(self.dataset.len_task)]])
+											[x for x in range(self.dataset.len_trial)]])
 
 		print 'Plot folding average between 2 mental workload. It may take a while...'
 
@@ -228,8 +263,15 @@ class Study(): # TODO: Class con cua Dataset?
 											['oxyHb', 'deoHb', 'totHb']])
 
 		
-		dfmi = pd.DataFrame(task, index = miTrial, columns = miChHb)
-		
+		dfmi = pd.DataFrame(trial, index = miTrial, columns = miChHb)
+		self.dataset.dfmi = dfmi 	# Dataframe group by trials
+
+	def plot_mean_2lvl(self, chan, Hbtype, lvl1_trials, lvl2_trials, lvllegend=None):
+		if self.dataset.dfmi.empty:
+			self.split2trials()
+
+		dfmi = self.dataset.dfmi
+
 		# Sort Hb types in order to perfome slicing
 		dfmi_Hbsorted = dfmi.T.sort_index().sort_index(axis=1) # EXTREMELY IMPORTANT
 
@@ -247,26 +289,38 @@ class Study(): # TODO: Class con cua Dataset?
 
 		# plot oxyHb, for example
 		oxyHblvl1 = lvl1.loc[idx[chan, Hbtype], idx[:, :]]
-		oxyHblvl1mean = self.calc_mean(oxyHblvl1, lvl1_trials, self.dataset.len_task)
+		oxyHblvl1mean = self.calc_mean(oxyHblvl1, lvl1_trials, self.dataset.len_trial)
 
 		deno = np.sqrt(oxyHblvl1mean.shape[1])
 		m1 = oxyHblvl1mean.apply(np.sum, axis=1)
 		s1 = oxyHblvl1mean.apply(np.std, axis=1) / deno
 
 		oxyHblvl2 = lvl2.loc[idx[chan, Hbtype], idx[:, :]]
-		oxyHblvl2mean = self.calc_mean(oxyHblvl2, lvl2_trials, self.dataset.len_task)
+		oxyHblvl2mean = self.calc_mean(oxyHblvl2, lvl2_trials, self.dataset.len_trial)
 
 		deno = np.sqrt(oxyHblvl2mean.shape[1])
 		m2 = oxyHblvl2mean.apply(np.sum, axis=1)
 		s2 = oxyHblvl2mean.apply(np.std, axis=1) / deno
+
 		
-		# Visualization 
-		line_lvl2 = plt.plot(m2.index, m2, 'r', label='Level 2')
+		## Visualization 
+		# Event marker 	
+		# TODO: import duration of rest1, task, and rest2
+		rest2task = int(self.dataset.Fs*30) 	
+ 		task2rest = int(self.dataset.Fs*(30+60))
+ 		plt.axvline(rest2task, color='g')
+ 		plt.axvline(task2rest, color='g')
+
+ 		# Signal
+		line_lvl2 = plt.plot(m2.index, m2, 'r', label=lvllegend[1])
 		plt.fill_between(s2.index, m2-2*s2, m2+2*s2, color='r', alpha=0.2)
 
-		line_lvl1 = plt.plot(m1.index, m1, 'b', label='Level 1')
+		line_lvl1 = plt.plot(m1.index, m1, 'b', label=lvllegend[0])
 		plt.fill_between(s1.index, m1-2*s1, m1+2*s1, color='b', alpha=0.2)
+
+		# Legends and titles
 		plt.title(chan + ', ' + Hbtype)
 		plt.legend()
+
 
 		
