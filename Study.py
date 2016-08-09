@@ -53,7 +53,11 @@ class Dataset():
 
 		# Update dataset variables
 		print self.df.tail()
+		newindex = newdataset.df.index + len(self.df.index)
+		newdataset.df.index = newindex
+		newdataset.event.index = newindex
 		self.df = self.df.append(newdataset.df)
+
 		print self.df.tail()
 		self.numtrial = self.numtrial + newdataset.numtrial
 		
