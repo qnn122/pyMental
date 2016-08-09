@@ -1,0 +1,2 @@
+label	I E I E
+description	I=Motor imagination, E=Motor Execution

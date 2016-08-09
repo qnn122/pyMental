@@ -1,0 +1,11 @@
+Motor Execution/Imagery
+Rest 	Task	Rest
+30s	60s	30s
+
+Label
+Run1
+ima - ima - exe - exe
+exe - ima - ima - exe
+
+Run2
+ima - exe - ima -exe
