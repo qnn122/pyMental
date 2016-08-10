@@ -1,16 +1,19 @@
 from Study import Study
 from matplotlib import pyplot as plt
+import numpy as np
 
 is_plotHB_raw = 0
 is_plot2lvl = 1
 is_plotHB_filt= 0
+is_savefile = 0
 
 
 # Initialize data
-subject = 'Khoai'
-filename = ['./data/Khoai_20160808_1165.TXT',
-			'./data/Khoai_20160808_1166.TXT']
-labelfile = './data/Khoai_20160808_protocol.TXT'
+subject = 'Thien_'
+date = '20160808_'
+filename = ['./data/' + subject + date + '1170.TXT',
+			'./data/' + subject + date + '1171.TXT']
+labelfile = './data/' + subject + date + 'protocol.TXT'
 
 study1 = Study(subject, filename)
 marker = study1.dataset.event
@@ -56,3 +59,13 @@ if is_plot2lvl:
 
 plt.show()
 
+
+# Save file
+if is_savefile:
+	study1.split2trials() 	# make sure dfmi_Hbsorted has been created
+	for i in ('oxyHb', 'deoHb'):
+		filename = subject + date + i + '.TXT'
+		study1.write_matrix(filename, i)
+
+	# 
+	np.savetxt(subject + date + 'label.TXT', study1.dataset.label, fmt='%s')

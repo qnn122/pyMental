@@ -29,7 +29,16 @@ class Dataset():
 			# Read numtrial
 			numtrial_row = pd.read_csv(filename, skiprows=11, nrows = 1, sep='\t', header=None,  index_col=0)
 			self.numtrial =  int(numtrial_row.values[0][0])
-			
+
+			# Read protocol timing 
+			self.prerest_time = pd.read_csv(filename, skiprows=8, nrows=1, sep='\t', 
+											header=None, index_col=0).values[0][0]
+			self.task_time = pd.read_csv(filename, skiprows=9, nrows=1, sep='\t', 
+											header=None, index_col=0).values[0][0]
+			self.posrest_time = pd.read_csv(filename, skiprows=10, nrows=1, sep='\t', 
+											header=None, index_col=0).values[0][0]
+
+
 		except:
 			print 'Something wrong 1'
 
@@ -63,7 +72,6 @@ class Dataset():
 		self.time = pd.Series(self.data_import[:, 0]) 		# first columnn contains time series
 		self.event = pd.Series(self.data_import[:, 1])		# second column = event vector
 
-		self.dfmi = pd.DataFrame() 	# df that has been split into trials, 'mi' = multi index
 
 	def append_data(self, filename):
 		# Read newd data file
@@ -116,6 +124,9 @@ class Study(): # TODO: Class con cua Dataset?
 
 		# moving averaging
 		self.mov_win = 5
+
+		self.dfmi = pd.DataFrame() 	# df that has been split into trials, 'mi' = multi index
+
 
 	''' =========== Filter ================'''
 	@staticmethod
@@ -234,6 +245,7 @@ class Study(): # TODO: Class con cua Dataset?
 		self.dfbp_mva = self.mva_filt(self.dfbp)
 		self.dfbp_mva_sm = self.smooth_df(self.dfbp_mva, 511)
 
+
 	# TODO: implement this one
 	def plot_mean_2lvl_temp(self, chan, Hbtype, twolabels, legends=None):
 		'''Plot folding everage of 2 mental workload levels
@@ -264,13 +276,17 @@ class Study(): # TODO: Class con cua Dataset?
 
 		
 		dfmi = pd.DataFrame(trial, index = miTrial, columns = miChHb)
-		self.dataset.dfmi = dfmi 	# Dataframe group by trials
+		dfmi_Hbsorted = dfmi.T.sort_index().sort_index(axis=1) # EXTREMELY IMPORTANT
+
+		self.dfmi = dfmi 	# Dataframe group by trials
+		self.dfmi_Hbsorted = dfmi_Hbsorted
 
 	def plot_mean_2lvl(self, chan, Hbtype, lvl1_trials, lvl2_trials, lvllegend=None):
-		if self.dataset.dfmi.empty:
+		if self.dfmi.empty:
 			self.split2trials()
 
-		dfmi = self.dataset.dfmi
+		dfmi = self.dfmi
+		dfmi_Hbsorted = self.dfmi_Hbsorted #TODO: make this  less sillyplease
 
 		# Sort Hb types in order to perfome slicing
 		dfmi_Hbsorted = dfmi.T.sort_index().sort_index(axis=1) # EXTREMELY IMPORTANT
@@ -306,8 +322,10 @@ class Study(): # TODO: Class con cua Dataset?
 		## Visualization 
 		# Event marker 	
 		# TODO: import duration of rest1, task, and rest2
-		rest2task = int(self.dataset.Fs*30) 	
- 		task2rest = int(self.dataset.Fs*(30+60))
+		prerest_time = self.dataset.prerest_time
+		task_time = self.dataset.task_time
+		rest2task = int(self.dataset.Fs*prerest_time) 	
+ 		task2rest = int(self.dataset.Fs*(prerest_time+task_time))
  		plt.axvline(rest2task, color='g')
  		plt.axvline(task2rest, color='g')
 
@@ -322,5 +340,8 @@ class Study(): # TODO: Class con cua Dataset?
 		plt.title(chan + ', ' + Hbtype)
 		plt.legend()
 
-
-		
+	def write_matrix(self, filename, Hbtype):
+		idx = pd.IndexSlice
+		Hbdf = self.dfmi_Hbsorted.loc[idx[:, Hbtype], idx[:,:]]
+		Hbmat = Hbdf.T.values
+		np.savetxt(filename, Hbmat, delimiter=' ')
